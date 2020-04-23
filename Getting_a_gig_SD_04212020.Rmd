@@ -1,0 +1,125 @@
+---
+title: "Getting a Gig"
+author: "Sean Corcoran, Sarah Dodamead, Christopher Matos, Ethan Tenison"
+date: "3/9/2020"
+output: html_document
+---
+
+```{r libraries, message=FALSE, warning=FALSE}
+list.of.packages <-
+        c(
+                "tidyverse",
+                "googledrive",
+                "janitor",
+                "dplyr",
+                "caret"
+                
+                
+           )
+#new.packages <-list.of.packages[!(list.of.packages %in% installed.packages()[, "Package"])]
+library(googledrive)
+library(tidyverse)
+library(janitor)
+library(dplyr)
+library(caret)
+```
+
+## Pulling in the data 
+
+```{r data, cache = TRUE}
+ drive_download(as_id("1S4B1Txs-ycsyO0X6DEA5C1STHt1fXeOK"), overwrite = TRUE)
+ data <- read.csv("EER396_Data_Set.csv", stringsAsFactors = FALSE)
+ data <- clean_names(data)
+ #str(data)
+```
+
+
+## Data Cleaning 
+
+Everything before submitting profile has been removed. Even after profile submission, leads that have not provided their age have also been removed.
+
+#### Variables that have been removed: 
+-da_activated
+-background_submit_Date
+-submit_profile_time, data before this point is insufficient 
+-orientation_selection_time
+-orientation_start_time (we need to check to see if this is valueable)
+-waitlist_end_date  (this would be more helpful if we knew what date they were put on a waitlist)
+-mvr_initiated  
+-mvr_cleared 
+-criminal_initiated
+-criminal_cleared
+-dropship_kit_ordered
+-orient_date
+-start_date  this is connected to activation which we also deleted 
+-first_dash_date, this is removed after the converted variable is created 
+-planned_time 
+-apply_date (this value is important if we need to calculate new day variables)
+-applied_submarket
+-planned_sp
+-planned_sm 
+-offer_end
+-is_waitlist, all the waitlisted leads were removed before removing the variable.
+-current_wl_status 
+-dash_day, was removed because we use first_dash_day
+-NA's were removed from submit_profile_time because we don't have enough data on individuals who haven't made it past that step.
+-da_bgc_info_sub, removed because everything NA
+-x, just an indentifier that I think believe has any meaning
+-dash_applicant_id, just an indentifier that I think believe has any meaning
+-dasher_id, just an indentifier that I think believe has any meaning
+-zipcode, it has non US zip codes, so I just took it out. 
+
+#### Variables that have been created: 
+-converted, binary variable describing if a lead has converted or not
+
+
+### Variables that have been imputed: 
+-phone model, blanks set to unknown
+-phone os, blanks set to unknown
+-app_version, blanks set to unknown
+-w9_signed, set to no 
+-orientation_type, set to none if blank 
+-offer, blanks set to none 
+-offer_amt, NA's set to zero
+-offer_deliv_req, NA's set to zero
+-delivs, NA's set to zero
+
+
+```{r datacleaning}
+#Leads that converted are given a 1 in the converted column 
+df <- data %>% mutate(converted = ifelse(!is.na(data$first_dash_date) & data$da_first_dash <=45, 1, 0)) %>% 
+        filter(!is.na(submit_profile_time)) %>% 
+        filter(is_waitlist != "waitlist") %>% 
+        filter(!is.na(age)) %>% 
+        select(-c("da_activated", "background_submit_date", "submit_profile_time", "orientation_selection_time","orientation_start_time", "mvr_initiated","mvr_cleared","criminal_initiated","criminal_cleared", "orient_date", "start_date", "first_dash_date", "planned_time", "waitlist_end_date" ,"dropship_kit_ordered","apply_date","planned_sp", "planned_sm", "offer_end", "is_waitlist", "current_wl_status","dash_day","da_bgc_info_sub", "x", "dasher_applicant_id", "dasher_id", "zip_code" ))
+# Filling in blank data 
+df$phone_model[df$phone_model == ''] <- "unknown"
+df$phone_os[df$phone_os == ''] <- "unknown"
+df$app_version[df$app_version == ''] <- "unknown"
+df$offer[df$offer == ''] <- "blank"
+df$w9_signed[df$w9_signed == ''] <- "no"
+df$orientation_type[df$orientation_type == ''] <- "none"
+df$offer_amt[is.na(df$offer_amt)] <- 0
+df$offer_deliv_req[is.na(df$offer_deliv_req)] <- 0
+df$delivs[is.na(df$delivs)] <- 0
+        
+ str(df)      
+        
+```
+
+
+## Logistic Regression
+
+```{r logistic_regression}
+# da_mvr_bgc_start + da_mvr_bgc_pass +
+logit <- glm(converted ~ age + orientation_type + channel + da_profile_submit + da_orientation_select
+             + da_dropshipping_created + da_oriented + holdout + applied_submarket, data = df, family = "binomial")
+summary(logit)
+```
+```{r linear regression with relavent variables at each step in application process}
+
+
+
+```
+
+
